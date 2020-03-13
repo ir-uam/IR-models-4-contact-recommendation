@@ -22,6 +22,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -71,6 +72,46 @@ public class AuxiliarMethods
     }
 
     /**
+     * Computes a recommendation and evaluates it using metrics.
+     *
+     * @param output      Route of the file in which to store the recommendation.
+     * @param recommender The recommender to apply.
+     * @param runner      The recommender runner
+     * @param metrics      The metrics to evaluate
+     *
+     * @return the value of the metrics.
+     *
+     * @throws IOException if something fails during the writing / reading of the recommendation file.
+     */
+    public static Map<String, Double> computeAndEvaluate(String output, Recommender<Long, Long> recommender, RecommenderRunner<Long, Long> runner, Map<String, SystemMetric<Long, Long>> metrics) throws IOException
+    {
+        RecommendationFormat<Long, Long> format = new SimpleRecommendationFormat<>(Parsers.lp, Parsers.lp);
+        RecommendationFormat.Writer<Long, Long> writer;
+        RecommendationFormat.Reader<Long, Long> reader;
+
+        Map<String, Double> values = new HashMap<>();
+
+
+        writer = format.getWriter(output);
+        runner.run(recommender, writer);
+        writer.close();
+
+        metrics.values().forEach(SystemMetric::reset);
+
+        reader = format.getReader(output);
+        reader.readAll().forEach(rec ->
+        {
+            if (rec != null && rec.getItems() != null && !rec.getItems().isEmpty())
+            {
+                metrics.values().forEach(metric -> metric.add(rec));
+            }
+        });
+
+        metrics.forEach((key, value) -> values.put(key, value.evaluate()));
+        return values;
+    }
+
+    /**
      * Computes a recommendation and evaluates it using nDCG metric. It does not write the recommendation.
      *
      * @param recommender The recommender to apply.
@@ -94,6 +135,34 @@ public class AuxiliarMethods
         });
 
         return metric.evaluate();
+    }
+
+    /**
+     * Computes a recommendation and evaluates it using some metrics. It does not write the recommendation.
+     *
+     * @param recommender The recommender to apply.
+     * @param runner      The recommender runner.
+     * @param metrics      The metrics.
+     *
+     * @return the value of the metrics.
+     */
+    public static Map<String, Double> computeAndEvaluate(Recommender<Long, Long> recommender, RecommenderRunner<Long, Long> runner, Map<String, SystemMetric<Long,Long>> metrics)
+    {
+        EmptyWriter<Long, Long> writer = new EmptyWriter<>();
+        runner.run(recommender, writer);
+
+        Map<String, Double> values = new HashMap<>();
+        metrics.values().forEach(SystemMetric::reset);
+        writer.readAll().forEach(rec ->
+        {
+            if (rec != null && rec.getItems() != null && !rec.getItems().isEmpty())
+            {
+                metrics.values().forEach(metric -> metric.add(rec));
+            }
+        });
+
+        metrics.forEach((key, value) -> values.put(key, value.evaluate()));
+        return values;
     }
 
     /**

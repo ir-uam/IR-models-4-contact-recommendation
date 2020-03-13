@@ -51,13 +51,13 @@ public class Main
             switch (main)
             {
                 case VALID:
-                    className = "es.uam.eps.ir.irmodels4contactrec.main.validation";
+                    className = "es.uam.eps.ir.irmodels4contactrec.main.Validation";
                     break;
                 case EVAL:
-                    className = "es.uam.eps.ir.irmodels4contactrec.main.eval";
+                    className = "es.uam.eps.ir.irmodels4contactrec.main.Evaluation";
                     break;
                 case STATISTICS:
-                    className = "es.uam.eps.ir.irmodels4contactrec.main.statistics";
+                    className = "es.uam.eps.ir.irmodels4contactrec.main.StatisticalSignificance";
                     break;
                 default:
                     System.err.println("ERROR: Unknown program.");
