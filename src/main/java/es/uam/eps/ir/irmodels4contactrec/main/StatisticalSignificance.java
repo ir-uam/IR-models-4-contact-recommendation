@@ -109,7 +109,7 @@ public class StatisticalSignificance
         {
             System.err.println("Nothing to evaluate!");
         }
-        
+
         
         // FILE FORMAT:
         // "user"\"Algorithm1"\"Algorithm2"\t...\t"AlgorithmN".
