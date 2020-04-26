@@ -35,6 +35,8 @@ public class Main
      */
     private final static String STATISTICS = "stats";
 
+    private final static String TUKEY = "tukey";
+
     /**
      * Main method. Executes the main method in the class specified by the first
      * argument with the rest of run time arguments.
@@ -58,6 +60,9 @@ public class Main
                     break;
                 case STATISTICS:
                     className = "es.uam.eps.ir.irmodels4contactrec.main.StatisticalSignificance";
+                    break;
+                case TUKEY:
+                    className = "es.uam.eps.ir.irmodels4contactrec.main.TukeyTestFileGenerator";
                     break;
                 default:
                     System.err.println("ERROR: Unknown program.");

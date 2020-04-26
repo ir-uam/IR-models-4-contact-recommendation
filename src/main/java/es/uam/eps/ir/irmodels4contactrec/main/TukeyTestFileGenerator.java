@@ -9,37 +9,30 @@
 package es.uam.eps.ir.irmodels4contactrec.main;
 
 import es.uam.eps.ir.irmodels4contactrec.data.GraphSimplePreferenceData;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import es.uam.eps.ir.irmodels4contactrec.metrics.TRECAveragePrecision;
 import es.uam.eps.ir.ranksys.core.preference.PreferenceData;
 import es.uam.eps.ir.ranksys.metrics.RecommendationMetric;
 import es.uam.eps.ir.ranksys.metrics.basic.AveragePrecision;
 import es.uam.eps.ir.ranksys.metrics.basic.NDCG;
+import es.uam.eps.ir.ranksys.metrics.basic.Precision;
+import es.uam.eps.ir.ranksys.metrics.basic.Recall;
 import es.uam.eps.ir.ranksys.metrics.rel.BinaryRelevanceModel;
-import org.apache.commons.math3.stat.inference.TTest;
 import org.ranksys.formats.parsing.Parsers;
-import static org.ranksys.formats.parsing.Parsers.lp;
 import org.ranksys.formats.preference.SimpleRatingPreferencesReader;
 import org.ranksys.formats.rec.RecommendationFormat;
 import org.ranksys.formats.rec.TRECRecommendationFormat;
+
+
+import java.io.*;
+import java.util.*;
+
+import static org.ranksys.formats.parsing.Parsers.lp;
 
 /**
  * Given some recommendations, computes the statistical significance between them.
  * @author Javier Sanz-Cruzado Puig
  */
-public class StatisticalSignificance
+public class TukeyTestFileGenerator
 {
     /**
      * Computes the p-values of different recommendations in terms of the precision, and writes
@@ -49,6 +42,7 @@ public class StatisticalSignificance
      *              <li><b>Rec. Path:</b> Path to the directory which contains all the recommendations</li>
      *              <li><b>Output:</b> File in which to store the statistical significance results</li>
      *              <li><b>Cutoff:</b> Number of items to consider in the recommendation</li>
+     *              <li><b>Threshold:</b> Minimum value for relevance</li>
      *              <li><b>Num. tails:</b> Number of tails to consider</li>
      *              <li><b>Directed:</b> True if the graph is directed, false if it is not</li>
      *              <li><b>Precision:</b> p if we want to check the statistical significance of precision, r if we want recall, ndcg if we want nDCG</li>
@@ -64,6 +58,7 @@ public class StatisticalSignificance
             for(int i = 0; i < args.length; ++i)
                 System.err.print("\t" + i+":" + args[i]);
             
+            System.err.println("");
             System.err.println("Usage: testDataPath recPath outputPath cutoff threshold numTails directed");
             return;
         }
@@ -71,25 +66,26 @@ public class StatisticalSignificance
         String testDataPath = args[0];
         String recPath = args[1];
         String outputPath = args[2];
-        int cutoff = Parsers.ip.parse(args[3]);
-        double threshold = 0.5;
-
-        int numTails = Parsers.ip.parse(args[4]);
+        int numTails = Parsers.ip.parse(args[5]);
         if(numTails < 1 || numTails > 2)
         {
             System.err.println("Error: Invalid arguments: numTails must be 1 or 2 ");
             for(int i = 0; i < args.length; ++i)
                 System.err.print("\t" + i+":" + args[i]);
             
+            System.err.println("");
             System.err.println("Usage: testDataPath recPath outputPath cutoff threshold numTails");
             return;
         }
         
-        boolean directed = args[5].equalsIgnoreCase("true");
-        String prec = args[6];
+        Boolean directed = args[6].equalsIgnoreCase("true");
+        String prec = args[7];
         // Read train and test data
         PreferenceData<Long, Long> testData = GraphSimplePreferenceData.load(SimpleRatingPreferencesReader.get().read(testDataPath, lp, lp), directed, false);
-
+        
+        int cutoff = Parsers.ip.parse(args[3]);
+        double threshold = Parsers.dp.parse(args[4]);
+        
         Map<Long, Integer> userList = new HashMap<>();
         testData.getUsersWithPreferences().forEach(user -> userList.put(user, userList.size()));
 
@@ -99,7 +95,9 @@ public class StatisticalSignificance
         // Configuration of the P@k metric
         RecommendationMetric<Long, Long> metric;
 
-        if (prec.equalsIgnoreCase("ndcg")) metric = new NDCG<>(cutoff, new NDCG.NDCGRelevanceModel<>(false, testData, threshold));
+        if(prec.equalsIgnoreCase("p"))metric = new Precision<>(cutoff, binRel);
+        else if(prec.equalsIgnoreCase("r")) metric = new Recall<>(cutoff, binRel);
+        else if (prec.equalsIgnoreCase("ndcg")) metric = new NDCG<>(cutoff, new NDCG.NDCGRelevanceModel<>(false, testData, threshold));
         else if (prec.equalsIgnoreCase("map")) metric = new TRECAveragePrecision<>(cutoff, binRel);
         else return; // Invalid metric
         Set<Long> users = new HashSet<>();
@@ -111,11 +109,10 @@ public class StatisticalSignificance
             System.err.println("Nothing to evaluate!");
         }
 
-        
         // FILE FORMAT:
         // "user"\"Algorithm1"\"Algorithm2"\t...\t"AlgorithmN".
         // user\tmetricAlg1\tmetricAlg2\tmetricAlg3\t...\tmetricAlgN
-        RecommendationFormat<Long, Long> format = new TRECRecommendationFormat<>(lp,lp);
+        RecommendationFormat<Long, Long> format = new TRECRecommendationFormat<>(lp, lp);
         String[] files = directory.list();
         
         List<String> recomms = new ArrayList<>();
@@ -137,43 +134,32 @@ public class StatisticalSignificance
                 }
             });
             
-            userList.forEach((key, value) -> values.get(file)[value] = indiv.getOrDefault(key, 0.0));
+            userList.entrySet().forEach(entry -> 
+            {
+                values.get(file)[entry.getValue()] = indiv.getOrDefault(entry.getKey(), 0.0);
+            });
             
             recomms.add(file);
         }
         
         recomms.sort(Comparator.naturalOrder());
-       
-        // Compute the p-values.
-        TTest ttest = new TTest();
+
         try(BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputPath))))
         {
             for(String file : recomms)
             {
-                bw.write("\t" + file);
+                bw.write("," + file);
             }
             bw.write("\n");
-            for(String f1 : recomms)
+
+            for(int i = 0; i < userList.size(); ++i)
             {
-                bw.write(f1);
-                
-                for(String f2 : recomms)
+                bw.write(i+"");
+                for(String file : recomms)
                 {
-                    if(f1.equals(f2))
-                    {
-                        bw.write("\n");
-                        break;
-                    }
-                    else
-                    {
-                        double value = ttest.pairedTTest(values.get(f1), values.get(f2));
-                        if(Double.isNaN(value))
-                            value = 1.0;
-                        else if(numTails == 1)
-                            value /= 2.0;
-                        bw.write("\t" + value);
-                    }
+                    bw.write("," + values.get(file)[i]);
                 }
+                bw.write("\n");
             }
         }
     }

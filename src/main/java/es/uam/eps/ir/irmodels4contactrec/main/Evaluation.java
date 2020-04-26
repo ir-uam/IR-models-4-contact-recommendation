@@ -16,12 +16,12 @@ import es.uam.eps.ir.irmodels4contactrec.graph.fast.FastGraph;
 import es.uam.eps.ir.irmodels4contactrec.graph.io.TextGraphReader;
 import es.uam.eps.ir.irmodels4contactrec.data.FastGraphIndex;
 import es.uam.eps.ir.irmodels4contactrec.data.GraphIndex;
+import es.uam.eps.ir.irmodels4contactrec.metrics.TRECAveragePrecision;
 import es.uam.eps.ir.irmodels4contactrec.recommender.SocialFastFilters;
 import es.uam.eps.ir.irmodels4contactrec.main.grid.AlgorithmGridReader;
 import es.uam.eps.ir.irmodels4contactrec.main.grid.AlgorithmGridSelector;
 import es.uam.eps.ir.ranksys.fast.preference.FastPreferenceData;
 import es.uam.eps.ir.ranksys.metrics.SystemMetric;
-import es.uam.eps.ir.ranksys.metrics.basic.AveragePrecision;
 import es.uam.eps.ir.ranksys.metrics.basic.AverageRecommendationMetric;
 import es.uam.eps.ir.ranksys.metrics.basic.NDCG;
 import es.uam.eps.ir.ranksys.metrics.rel.BinaryRelevanceModel;
@@ -196,7 +196,7 @@ public class Evaluation
 
             // First, create the nDCG metric (for measuring accuracy)
             SystemMetric<Long, Long> nDCG = new AverageRecommendationMetric<>(new NDCG<>(maxLength, ndcgModel), numUsers);
-            SystemMetric<Long, Long> MAP = new AverageRecommendationMetric<>(new AveragePrecision<>(maxLength,idealModel), numUsers);
+            SystemMetric<Long, Long> MAP = new AverageRecommendationMetric<>(new TRECAveragePrecision<>(maxLength, idealModel), numUsers);
             Map<String, SystemMetric<Long,Long>> metrics = new HashMap<>();
             metrics.put("ndcg", nDCG);
             metrics.put("map", MAP);
